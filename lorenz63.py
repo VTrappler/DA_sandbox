@@ -18,10 +18,11 @@ class Lorenz63Model:
         self.initstate = init
         self.history = np.atleast_1d(0), init.reshape(3, 1)
 
-    def L63(self, x, t):
+    @staticmethod
+    def L63(x, t):
         """Lorenz 96 model with constant forcing"""
         # Setting up vector
-        d = np.zeros(self.dim)
+        d = np.zeros(3)
         d[0] = 10 * (x[1] - x[0])
         d[1] = 28 * x[0] - x[1] - x[0] * x[2]
         d[2] = -x[2] * 8.0 / 3.0 + x[1] * x[0]

@@ -1,7 +1,7 @@
 import numpy as np
-import scipy
 import matplotlib.pyplot as plt
-
+from solvers import integrate_RK4
+import cmasher as cmr
 
 Nx = 36
 Nu = 360
@@ -35,16 +35,31 @@ def lorenz2scale_dot(t, xu):
     return np.concatenate([dx, du])
 
 
+class Lorenz2scalesModel:
+    def __init__(self, Nx=36):
+        "docstring"
+        self.Nx = Nx
+        self.Nu = 10 * Nx
+        self.dim = self.Nx + self.Nu
+
+    @staticmethod
+    def dotfunction(t, xu):
+        return lorenz2scale_dot(t, xu)
+
+    def integrate():
+        pass
+
+
 if __name__ == "__main__":
     initial_state = np.random.normal(0, 1, size=(Nx + Nu))
-    dt = 0.005
-    inte = scipy.integrate.solve_ivp(
-        lorenz2scale_dot,
-        y0=initial_state,
-        t_span=(0, 10),
-    )
-    plt.subplot(1, 2, 1)
-    plt.imshow(inte.y[:Nx], aspect="auto")
-    plt.subplot(1, 2, 2)
-    plt.imshow(inte.y[Nx:], aspect="auto")
+    dt = 0.0001
+    t = 0
+
+    Nsteps = 100_000
+    t, x = integrate_RK4(lorenz2scale_dot, 0, initial_state, dt, Nsteps)
+
+    initial_state[380] += 0.0001
+    t, x2 = integrate_RK4(lorenz2scale_dot, 0, initial_state, dt, Nsteps)
+
+    plt.imshow(x - x2, aspect="auto", cmap="cmr.iceburn")
     plt.show()
