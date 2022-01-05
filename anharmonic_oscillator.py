@@ -1,71 +1,53 @@
-# -*- coding: utf-8 -*-
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 import numpy as np
 import matplotlib.pyplot as plt
+from solvers import integrate_step
+from dynmodels import DynamicalModel as Model
 
 
-class NonlinearOscillatorModel:
-    def __init__(
-        self,
-    ):
-        "docstring"
+class NonLinearOscillatorModel(Model):
+    dim = 2
+    omega = 0.035
+    lam = 3e-5
+    xi = None
+    dt = 1
 
-    def initial_state(self, x0=0, x1=1):
-        self.state_vector = np.atleast_2d([x0, x1])
-
-    def nonlinear_oscillator_step(self, xk, xkm1, xi=None, omega=0.035, lam=3e-5):
-        if xi is None:
-            xi = np.random.randn(1) * np.sqrt(0.0025)
-        return 2 * xk - xkm1 + (omega ** 2) * xk - (lam ** 2) * xk ** 3 + xi
-
-    def step(self, Nsteps):
-        xnew = np.empty(Nsteps)
-        xnew[0] = self.nonlinear_oscillator_step(
-            self.state_vector[-1], self.state_vector[-2]
-        )
-        xnew[1] = self.nonlinear_oscillator_step(xnew[0], self.state_vector[1])
-        for i in range(1, Nsteps - 1):
-            xnew[i + 1] = self.nonlinear_oscillator_step(xnew[i], xnew[i - 1])
-
-        self.state_vector = np.concatenate([self.state_vector, xnew])
-
-
-class NonLinearOscillatorModel_2d:
     def __init__(self):
-        "docstring"
+        pass
 
-    def initial_state(self, initial_state):
-        self.state_vector = np.array(initial_state).reshape(2, 1)
+    def set_initial_state(self, t0, x0):
+        self.state_vector = np.array(x0).reshape(2, 1)
+        self.t = np.array(t0).reshape(1)
 
-    def nonlinear_oscillator_step(self, state, xi=None, omega=0.035, lam=3e-5):
-        if xi is None:
+    @classmethod
+    def step(cls, f, t, x, dt):
+        if cls.xi is None:
             xi = np.random.randn(1) * np.sqrt(0.0025)
+        else:
+            xi = cls.xi
         return np.array(
             [
-                state[1],
-                2 * state[1]
-                - state[0]
-                + (omega ** 2) * state[1]
-                - (lam ** 2) * state[1] ** 3
+                x[1],
+                2 * x[1]
+                - x[0]
+                + (cls.omega ** 2) * x[1]
+                - (cls.lam ** 2) * x[1] ** 3
                 + xi[0],
             ]
         )
 
-    def step(self, Nsteps):
-        xnew = np.empty((2, Nsteps))
-        # xnew[0] = self.nonlinear_oscillator_step(self.state_vector)
-        xnew[:, 0] = self.nonlinear_oscillator_step(self.state_vector[:, -1])
-
-        for i in range(1, Nsteps):
-            xnew[:, i] = self.nonlinear_oscillator_step(xnew[:, i - 1])
-        self.state_vector = np.hstack([self.state_vector, xnew])
+    @classmethod
+    def integrate(cls, t0, x0, Nsteps):
+        return integrate_step(cls.step, f=None, t0=t0, x0=x0, dt=cls.dt, Nsteps=Nsteps)
 
 
-osci_2d = NonLinearOscillatorModel_2d()
-osci_2d.initial_state([0, 1])
-osci_2d.step(10)
-osci_2d.state_vector
+osci = NonLinearOscillatorModel()
+osci.set_initial_state(0, [0, 1])
+osci.forward(1000)
+plt.plot(osci.state_vector[0, :])
+plt.show()
 
 
 def sample_observations(vector, spacing, shift):
@@ -74,7 +56,7 @@ def sample_observations(vector, spacing, shift):
 
 def main():
     N_iter = 5000
-    oscillator = NonLinearOscillatorModel_2d()
+    oscillator = NonLinearOscillatorModel()
     oscillator.initial_state([0, 1])
     oscillator.step(N_iter)
     sigma2_obs = 49

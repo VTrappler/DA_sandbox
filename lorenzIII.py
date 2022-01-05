@@ -1,10 +1,11 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 import numpy as np
 import matplotlib.pyplot as plt
-from solvers import integrate_RK4
+from solvers import RK4_step, integrate_step
+from dynmodels import DynamicalModel as Model
 import cmasher as cmr
-
-Nx = 36
-Nu = 360
 
 
 def phi(v, pm):
@@ -15,7 +16,7 @@ def xdot(x, u, F=15, h=1, c=10, b=10):
     return (
         phi(x, 1)
         + F
-        - (h * c / b) * np.fromiter(map(sum, np.split(u, Nx)), dtype="float")
+        - (h * c / b) * np.fromiter(map(sum, np.split(u, len(x))), dtype="float")
     )
 
 
@@ -35,31 +36,56 @@ def lorenz2scale_dot(t, xu):
     return np.concatenate([dx, du])
 
 
-class Lorenz2scalesModel:
-    def __init__(self, Nx=36):
+class Lorenz2scalesModel(Model):
+    dt = None
+    solver = RK4_step
+
+    @classmethod
+    def dotfunction(cls, t: float, xu: np.ndarray) -> np.ndarray:
+        return lorenz2scale_dot(t, xu)
+
+    @classmethod
+    def integrate(cls, t0: float, x0: np.ndarray, Nsteps: int, verbose=True):
+        return integrate_step(
+            cls.solver, cls.dotfunction, t0, x0, cls.dt, Nsteps, verbose=verbose
+        )
+
+    def __init__(self, Nx=36) -> None:
         "docstring"
         self.Nx = Nx
         self.Nu = 10 * Nx
         self.dim = self.Nx + self.Nu
 
-    @staticmethod
-    def dotfunction(t, xu):
-        return lorenz2scale_dot(t, xu)
+    @classmethod
+    def set_observation_operator(cls, H: callable) -> None:
+        cls.H = H
 
-    def integrate():
-        pass
+    @classmethod
+    def set_observation_errors(cls, obserr):
+        cls.vk = obserr
+
+    def observe(self):
+        vk = self.vk()
+        return self.H(self.state_vector) + vk
 
 
 if __name__ == "__main__":
+    Nx, Nu = 36, 360
     initial_state = np.random.normal(0, 1, size=(Nx + Nu))
-    dt = 0.0001
-    t = 0
+    lorenzIII = Lorenz2scalesModel()
+    dt = 0.001
+    Lorenz2scalesModel.dt = dt
+    lorenzIII.set_initial_state(0, initial_state)
+    lorenzIII.forward(10000)
 
-    Nsteps = 100_000
-    t, x = integrate_RK4(lorenz2scale_dot, 0, initial_state, dt, Nsteps)
+    lorenzIII_ = Lorenz2scalesModel()
+    initial_state[380] += 0.00001
+    lorenzIII_.set_initial_state(0, initial_state)
+    lorenzIII_.forward(10000)
 
-    initial_state[380] += 0.0001
-    t, x2 = integrate_RK4(lorenz2scale_dot, 0, initial_state, dt, Nsteps)
-
-    plt.imshow(x - x2, aspect="auto", cmap="cmr.iceburn")
+    plt.imshow(
+        lorenzIII.state_vector,
+        aspect="auto",
+        cmap=cmr.lavender,
+    )
     plt.show()

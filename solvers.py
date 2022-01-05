@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
+
+
 import numpy as np
-from tqdm import tqdm
-from functools import partial
+import tqdm
 
 
 def RK4_step(f, t, x, dt, *args):
@@ -84,14 +85,14 @@ def DoPri45_step(f, t, x, h):
     return x + h * v5
 
 
-def integrate_step(step, f, t0, x0, dt, Nsteps, *args):
+def integrate_step(step, f, t0, x0, dt, Nsteps, verbose=False, *args):
     t = np.empty(Nsteps + 1)
     t[0] = t0
     t_ = t0
     x = np.empty((len(x0), Nsteps + 1))
     x[:, 0] = x0
     curr_x = x0
-    for i in tqdm.trange(Nsteps):
+    for i in tqdm.trange(Nsteps, disable=(not verbose)):
         curr_x = step(f, t, curr_x, dt, *args)
         t_ += dt
         t[i + 1] = t_
@@ -99,7 +100,7 @@ def integrate_step(step, f, t0, x0, dt, Nsteps, *args):
     return t, x
 
 
-def integrate_RK4(f, t0, x0, dt, Nsteps, *args):
+def integrate_RK4(f, t0, x0, dt, Nsteps, verbose=True, *args):
     """Integrate the given ODE for Nsteps
 
     :param f:
@@ -110,4 +111,4 @@ def integrate_RK4(f, t0, x0, dt, Nsteps, *args):
     :returns:
 
     """
-    return integrate_step(RK4_step, f, t0, x0, dt, Nsteps, *args)
+    return integrate_step(RK4_step, f, t0, x0, dt, Nsteps, verbose=verbose, *args)

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import scipy
 
 
-class LorenzModel:
+class LorenzModel93:
     def __init__(self, dimension=40):
         self.state = np.empty((dimension, 1))
         self.history = np.empty(0), np.empty((dimension, 0))
