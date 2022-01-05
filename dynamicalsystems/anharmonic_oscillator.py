@@ -17,10 +17,6 @@ class NonLinearOscillatorModel(Model):
     def __init__(self):
         pass
 
-    def set_initial_state(self, t0, x0):
-        self.state_vector = np.array(x0).reshape(2, 1)
-        self.t = np.array(t0).reshape(1)
-
     @classmethod
     def step(cls, f, t, x, dt):
         if cls.xi is None:
@@ -44,7 +40,7 @@ class NonLinearOscillatorModel(Model):
 
 
 osci = NonLinearOscillatorModel()
-osci.set_initial_state(0, [0, 1])
+osci.set_initial_state(0, np.array([0, 1]))
 osci.forward(1000)
 plt.plot(osci.state_vector[0, :])
 plt.show()

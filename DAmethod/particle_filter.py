@@ -5,16 +5,18 @@
 import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
+from typing import Optional, Union, Callable, Tuple
 import scipy.stats
-from lorenz63 import Lorenz63Model
+from dynamicalsystems.lorenz63 import Lorenz63Model
 
 # from lorenz import LorenzModel
-from anharmonic_oscillator import NonLinearOscillatorModel
-import tqdm
+from dynamicalsystems.anharmonic_oscillator import NonLinearOscillatorModel
+
+# import tqdm
 
 
 class ParticleFilter:
-    def __init__(self, state_dimension, Nparticles, R):
+    def __init__(self, state_dimension: int, Nparticles: int, R: np.ndarray):
         self._state_dimension = state_dimension
         self._Nparticles = Nparticles
         self._R = R
@@ -38,7 +40,7 @@ class ParticleFilter:
         return self._H
 
     @H.setter
-    def H(self, value):
+    def H(self, value: Union[np.ndarray, callable]):
         if callable(value):
             self._H = value
         elif isinstance(value, np.ndarray):
@@ -117,9 +119,18 @@ class ParticleFilter:
         self.weights = self.weights / sum(self.weights)
 
     def estimate(self):
-        return self.weighted_moments(self.particles, self.weights)
+        return self.weighted_moments(
+            self.particles,
+            self.weights,
+        )
 
-    def run(self, Nsteps, get_obs, full_obs=True, ESS_lim=None):
+    def run(
+        self,
+        Nsteps: int,
+        get_obs: Callable[[int], Tuple[float, np.ndarray]],
+        full_obs: bool = True,
+        ESS_lim: Optional[float] = None,
+    ):
         if ESS_lim is None:
             ESS_lim = 0.6 * self.Nparticles
         observations = []
@@ -181,30 +192,6 @@ def main_PF_oscillator(
     )
 
     dPF = PF.run(assimilation_steps, generate_observations, full_obs=True, ESS_lim=None)
-
-    # observations = []
-    # estimates = []
-    # particles_ = []
-    # t_assim = []
-    # weights = []
-    # for i in range(assimilation_steps):
-    #     PF.propagate_particles()
-    #     particles_.append(PF.particles)
-    #     weights.append(PF.weights)
-    #     tt, obs = generate_observations()
-    #     observations.append(obs)
-    #     t_assim.append(tt)
-    #     PF.update_weights(H @ obs)
-    #     # plt.scatter(x=PF.particles[0, :], y=PF.particles[1, :], s=PF.weights)
-    #     # plt.plot(obs[0], obs[1], "x", color="red")
-    #     est, _ = PF.estimate()
-    #     estimates.append(est)
-    #     print(f"{i}, ESS={PF.get_ESS()}, sumweights = {PF.weights.sum()}")
-    #     if PF.get_ESS() < (10 * PF.Nparticles):
-    #         PF.resample_particles()
-    #         print("Resampling")
-    #     # plt.plot(est[0], est[1], "x", color="black")
-    #     # plt.show()
 
     est_ = np.array(dPF["estimates"])[:, 0]
     obs_ = np.array(dPF["observations"])[:, 0]
@@ -310,18 +297,19 @@ def main_Lorenz63_oscillator(
 
 
 if __name__ == "__main__":
-    main_PF_oscillator(Nparticles=1000, assimilation_steps=150, period_assim=50)
-    dPF, truth = main_Lorenz63_oscillator(
-        Nparticles=1000, assimilation_steps=50, period_assim=5
-    )
+    # main_PF_oscillator(Nparticles=1000, assimilation_steps=150, period_assim=50)
+    # dPF, truth = main_Lorenz63_oscillator(
+    #     Nparticles=1000, assimilation_steps=50, period_assim=5
+    # )
 
-    est_ = np.array(dPF["estimates"])[:, 0, :]
-    obs_ = np.array(dPF["observations"])
+    # est_ = np.array(dPF["estimates"])[:, 0, :]
+    # obs_ = np.array(dPF["observations"])
 
-    for i in range(3):
-        plt.subplot(3, 1, i + 1)
-        plt.plot(truth.t[5001:], truth.state_vector[i, 5001:])
-        plt.scatter(dPF["time"], obs_[:, i], marker="o", c="red", s=20)
-        plt.scatter(dPF["time"], est_[:, i], marker="x", color="blue", s=20)
-        plt.vlines(dPF["time"], est_[:, i], obs_[:, i])
-    plt.show()
+    # for i in range(3):
+    #     plt.subplot(3, 1, i + 1)
+    #     plt.plot(truth.t[5001:], truth.state_vector[i, 5001:])
+    #     plt.scatter(dPF["time"], obs_[:, i], marker="o", c="red", s=20)
+    #     plt.scatter(dPF["time"], est_[:, i], marker="x", color="blue", s=20)
+    #     plt.vlines(dPF["time"], est_[:, i], obs_[:, i])
+    # plt.show()
+    print("in main??")

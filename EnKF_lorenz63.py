@@ -3,9 +3,8 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from lorenz63 import Lorenz63Model
-from EnKF import EnKF, Kalman_gain
-import tqdm
+from dynamicalsystems.lorenz63 import Lorenz63Model
+from DAmethod.EnKF import EnKF, Kalman_gain
 
 
 def forecast_lorenz63(x_ensemble):
@@ -41,7 +40,8 @@ if __name__ == "__main__":
         0, np.sqrt(0.2), size=3
     )
 
-    EnKF_63 = EnKF(state_dimension=3, ensemble_size=20, period_assim=20, H=H, R=R)
+    EnKF_63 = EnKF(state_dimension=3, ensemble_size=20,
+                   period_assim=20, H=H, R=R)
     EnKF_63.generate_ensemble(
         initial_state,
         np.asarray(

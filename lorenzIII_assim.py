@@ -4,8 +4,8 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from lorenzIII import Lorenz2scalesModel
-from lorenz93 import Lorenz93Model
+from dynamicalsystems.lorenzIII import Lorenz2scalesModel
+from dynamicalsystems.lorenz93 import Lorenz93Model
 
 
 Nx, Nu = 36, 360

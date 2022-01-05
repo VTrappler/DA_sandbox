@@ -2,14 +2,15 @@
 #!/usr/bin/env python
 
 
+from typing import Callable, Tuple, Union, Optional
 import numpy as np
 import scipy.integrate
 import matplotlib.pyplot as plt
 import scipy
 from dataclasses import dataclass
-from lorenz import LorenzModel
-from anharmonic_oscillator import NonLinearOscillatorModel_2d
 import tqdm
+
+from dynamicalsystems.anharmonic_oscillator import NonLinearOscillatorModel
 
 """
 x_{k+1} = M_k(x_k)  + w_k
@@ -19,17 +20,75 @@ where Cov[v_k] = R_k, Cov[w_k] = Q_k
 """
 
 
-@dataclass
 class EnKF:
-    state_dimension: int
-    ensemble_size: int
-    period_assim: int
-    H: np.ndarray
-    R: np.ndarray
+    @classmethod
+    def Kalman_gain(cls, H: np.ndarray, Pf: np.ndarray, R: np.ndarray) -> np.ndarray:
+        """Computes the Kalman Gain Given the observation matrix, the prior covariance matrix and the error covariance matrix error R
 
-    def __post_init__(self):
-        self.observations = []
+        :param H: Linearized observation operator
+        :type H: np.ndarray
+        :param Pf: Covariance matrix of the prior error
+        :type Pf: np.ndarray
+        :param R: Covariance matrix of the observation errors
+        :type R: np.ndarray
+        :return: Kalman Gain
+        :rtype: np.ndarray
+        """
 
+        return np.linalg.multi_dot(
+            [
+                Pf,
+                H.T,
+                np.linalg.inv(np.linalg.multi_dot([H, Pf, H.T]) + R),
+            ]
+        )
+
+    def __init__(
+        self,
+        state_dimension: int,
+        Nensemble: int,
+        R: np.ndarray,
+        inflation_factor: float = 1.0,
+    ) -> None:
+        self._state_dimension = state_dimension
+        self._Nensemble = Nensemble
+        self._R = R
+        self._inflation_factor = inflation_factor
+
+    # EnKF parameters ---
+    @property
+    def Nensemble(self):
+        return self._Nensemble
+
+    @property
+    def state_dimension(self):
+        return self._state_dimension
+
+    @property
+    def R(self):
+        """Observation error covariance matrix"""
+        return self._R
+
+    @property
+    def inflation_factor(self):
+        """Initialize inflation factor"""
+        return self._inflation_factor
+
+    @property
+    def H(self):
+        """Observation operator or matrix"""
+        return self._H
+
+    @H.setter
+    def H(self, value):
+        if callable(value):
+            self._H = value
+            self.linearH = None
+        elif isinstance(value, np.ndarray):
+            self._H = lambda x: value @ x
+            self.linearH = value
+
+    # Methods for manipulating ensembles ---
     @property
     def xf_ensemble(self):
         return self._xf_ensemble
@@ -49,23 +108,37 @@ class EnKF:
         self.Pa = np.cov(xa_i)
 
     def set_forwardmodel(self, model):
-        self.forwardmodel = model
+        self.forward = model
 
-    def generate_ensemble(self, mean, cov):
+    def generate_ensemble(self, mean: np.ndarray, cov: np.ndarray):
+        """Generation of the ensemble members, using a multivariate normal rv
+
+        :param mean: mean of the ensemble members
+        :type mean: np.ndarray
+        :param cov: Covariance matrix
+        :type cov: np.ndarray
+        """
         self.xf_ensemble = np.random.multivariate_normal(
-            mean=mean, cov=cov, size=self.ensemble_size
+            mean=mean, cov=cov, size=self.Nensemble
         ).T
         self.xf_ensemble_total = self.xf_ensemble[:, :, np.newaxis]
 
-    def analysis(self, y, stochastic=True):
+    def analysis(self, y: np.ndarray, stochastic: bool = True) -> None:
+        """Performs the analysis step given the observation
+
+        :param y: Observation to be assimilated
+        :type y: np.ndarray
+        :param stochastic: Perform Stochastic EnKF, ie perturbates observations, defaults to True
+        :type stochastic: bool, optional
+        """
         if stochastic:
             u = np.random.multivariate_normal(
-                mean=np.zeros_like(y), cov=self.R, size=self.ensemble_size
+                mean=np.zeros_like(y), cov=self.R, size=self.Nensemble
             )
             y = y + u
-            self.R = np.atleast_2d(np.cov(u.T))
-        Kstar = Kalman_gain(self.H, self.Pf, self.R)
-        anomalies_vector = y.T - self.H @ self.xf_ensemble
+            self._R = np.atleast_2d(np.cov(u.T))  # Compute empirical covariance matrix
+        Kstar = self.Kalman_gain(self.linearH, self.inflation_factor * self.Pf, self.R)
+        anomalies_vector = y.T - self.linearH @ self.xf_ensemble
         self.xa_ensemble = self.xf_ensemble + Kstar @ anomalies_vector
         try:
             self.xa_ensemble_total = np.concatenate(
@@ -74,43 +147,46 @@ class EnKF:
         except AttributeError:
             self.xa_ensemble_total = self.xa_ensemble[:, :, np.newaxis]
 
-    def forecast(self, xin):
-        if xin is None:
-            xin = self.xf_ensemble
-        x_forward = np.empty_like(xin)
-        for i, x_member in enumerate(xin.T):
-            x_forward[:, i] = self.forwardmodel(x_member)
-        self.xf_ensemble = x_forward
-        self.xf_ensemble_total = np.concatenate(
-            [self.xf_ensemble_total, self.xf_ensemble[:, :, np.newaxis]], 2
-        )
+    def forecast_ensemble(self) -> None:
+        """Propagates the ensemble members through the model"""
+        try:
+            self.xf_ensemble = np.apply_along_axis(
+                self.forward,
+                axis=0,
+                arr=self.xf_ensemble,
+            )
+            self.xf_ensemble_total = np.concatenate(
+                [self.xf_ensemble_total, self.xf_ensemble[:, :, np.newaxis]], 2
+            )
+        except NameError:
+            print("No ensemble member defined")
 
-    def get_observation(self):
-        pass
+    def run(
+        self,
+        Nsteps: int,
+        get_obs: Callable[[int], Tuple[float, np.ndarray]],
+        full_obs=True,
+    ) -> dict:
 
-    def assimilation(self, Nsteps):
-        for i in tqdm.trange(Nsteps):
-            for j in tqdm.trange(self.period_assim):
-                if j == 0 and i != 0:
-                    self.forecast(self.xa_ensemble)
-                else:
-                    self.forecast(self.xf_ensemble)
-            y = self.get_observation()
-            try:
-                self.observations.append(y)
-            except AttributeError:
-                self.observations = [y]
-            self.analysis(y)
+        observations = []
+        ensemble_f = []
+        ensemble_a = []
+        time = []
+        for i in range(Nsteps):
+            self.forecast_ensemble()
+            ensemble_f.append(self.xf_ensemble)
+            t, y = get_obs(i)
+            observations.append(y)
+            time.append(t)
 
-
-def Kalman_gain(H, Pf, R):
-    return np.linalg.multi_dot(
-        [
-            Pf,
-            H.T,
-            np.linalg.inv(np.linalg.multi_dot([H, Pf, H.T]) + R),
-        ]
-    )
+            self.analysis(self.H(y))
+            ensemble_a.append(self.xa_ensemble)
+        return {
+            "observations": observations,
+            "ensemble_f": ensemble_f,
+            "ensemble_a": ensemble_a,
+            "time": time,
+        }
 
 
 # Create member of the ensemble
@@ -293,12 +369,12 @@ def main_nonlinear_oscillator(
     EnKF_o.generate_ensemble(np.array([0, 1]), np.asarray([[10, 2], [2, 10]]))
 
     def forward(x):
-        oscil = NonLinearOscillatorModel_2d()
+        oscil = NonLinearOscillatorModel()
         oscil.initial_state(x)
         oscil.step(1)
         return oscil.state_vector[:, -1]
 
-    oscillator = NonLinearOscillatorModel_2d()
+    oscillator = NonLinearOscillatorModel()
     oscillator.initial_state([0, 1])
 
     def generate_observations():
