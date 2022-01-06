@@ -4,11 +4,9 @@
 
 from typing import Callable, Tuple, Union, Optional
 import numpy as np
-import scipy.integrate
+import scipy.linalg as la
 import matplotlib.pyplot as plt
-import scipy
 from dataclasses import dataclass
-import tqdm
 from DAmethod.EnsembleMethod import EnsembleMethod
 
 from dynamicalsystems.anharmonic_oscillator import NonLinearOscillatorModel
@@ -21,7 +19,7 @@ where Cov[v_k] = R_k, Cov[w_k] = Q_k
 """
 
 
-class EnKF(EnsembleMethod):
+class ETKF(EnsembleMethod):
     """Wrapper class for running an EnKF"""
 
     @classmethod
@@ -56,14 +54,23 @@ class EnKF(EnsembleMethod):
         self._state_dimension = state_dimension
         self._Nensemble = Nensemble
         self._R = R
-        self._inflation_factor = inflation_factor
 
-    # EnKF parameters ---
+    def normalised_anomalies(self) -> np.ndarray:
+        return (self.xf_ensemble - self.xf_ensemble.mean(1, keepdims=True)) / np.sqrt(
+            self.Nensemble - 1
+        )
 
-    @property
-    def inflation_factor(self):
-        """Initialize inflation factor"""
-        return self._inflation_factor
+    def observation_anomalies(self) -> np.ndarray:
+        Hxf = self.H(self.xf_ensemble)
+        return (Hxf - Hxf.mean(1, keepdims=True)) / np.sqrt(self.Nensemble - 1)
+
+    def compute_transform(self) -> Tuple[np.ndarray, np.ndarray]:
+        Yf = self.observation_anomalies()
+        Tsqm1 = np.eye(self.Nensemble) + Yf.T @ la.inv(self.R) @ Yf
+        Tsq = la.inv(Tsqm1)
+        return la.sqrtm(Tsq), Tsq
+
+
 
     def generate_ensemble(self, mean: np.ndarray, cov: np.ndarray) -> None:
         """Generation of the ensemble members, using a multivariate normal rv
@@ -86,15 +93,18 @@ class EnKF(EnsembleMethod):
         :param stochastic: Perform Stochastic EnKF, ie perturbates observations, defaults to True
         :type stochastic: bool, optional
         """
-        if stochastic:
-            u = np.random.multivariate_normal(
-                mean=np.zeros_like(y), cov=self.R, size=self.Nensemble
-            )
-            y = y + u
-            self._R = np.atleast_2d(np.cov(u.T))  # Compute empirical covariance matrix
-        Kstar = self.Kalman_gain(self.linearH, self.inflation_factor * self.Pf, self.R)
-        anomalies_vector = y.T - self.linearH @ self.xf_ensemble
-        self.xa_ensemble = self.xf_ensemble + Kstar @ anomalies_vector
+
+        innovation_vector = y - (self.H(self.xf_ensemble)).mean(1, keepdims=True)
+        Yf = self.observation_anomalies()
+        T, T2 = self.compute_transform()
+        wa = T2 @ Yf.T @ la.solve(self.R, innovation_vector, sym_pos=True)
+
+        xfbar = self.xf_ensemble.mean(1, keepdims=True)
+
+        self.xa_ensemble = xfbar + self.normalised_anomalies() @ (
+            wa + np.sqrt(self.Nensemble - 1) * T
+        )
+
         try:
             self.xa_ensemble_total = np.concatenate(
                 [self.xa_ensemble_total, self.xa_ensemble[:, :, np.newaxis]], 2

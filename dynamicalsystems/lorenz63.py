@@ -56,14 +56,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# H = np.array([1, 0, 0])
-
-# def generate_obs(Ntot, burn=1000):
-#     lorenz63 = Lorenz63Model()
-#     dt = 0.02
-#     lorenz63.initial_state(np.array([0, 1, 0]))
-#     lorenz63.step(dt, Ntot)
-#     xobs = H @ lorenz63.history[1]
-#     xobs_per = xobs + np.random.normal(loc=0, scale=np.sqrt(0.2), size=(Ntot))
-#     return xobs[burn:], xobs_per[burn:]
