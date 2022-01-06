@@ -153,13 +153,18 @@ class EnKF:
             self.xf_ensemble = np.apply_along_axis(
                 self.forward,
                 axis=0,
+                arr=self.xa_ensemble,
+            )
+        except AttributeError:
+            self.xf_ensemble = np.apply_along_axis(
+                self.forward,
+                axis=0,
                 arr=self.xf_ensemble,
             )
-            self.xf_ensemble_total = np.concatenate(
-                [self.xf_ensemble_total, self.xf_ensemble[:, :, np.newaxis]], 2
-            )
-        except NameError:
-            print("No ensemble member defined")
+
+        self.xf_ensemble_total = np.concatenate(
+            [self.xf_ensemble_total, self.xf_ensemble[:, :, np.newaxis]], 2
+        )
 
     def run(
         self,
