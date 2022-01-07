@@ -69,3 +69,21 @@ class EnsembleMethod:
 
     def set_forwardmodel(self, model: Callable) -> None:
         self.forward = model
+
+    @property
+    def inflation_factor(self):
+        """Initialize inflation factor"""
+        return self._inflation_factor
+
+    def generate_ensemble(self, mean: np.ndarray, cov: np.ndarray) -> None:
+        """Generation of the ensemble members, using a multivariate normal rv
+
+        :param mean: mean of the ensemble members
+        :type mean: np.ndarray
+        :param cov: Covariance matrix
+        :type cov: np.ndarray
+        """
+        self.xf_ensemble = np.random.multivariate_normal(
+            mean=mean, cov=cov, size=self.Nensemble
+        ).T
+        self.xf_ensemble_total = self.xf_ensemble[:, :, np.newaxis]
