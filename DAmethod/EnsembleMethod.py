@@ -1,25 +1,32 @@
 from typing import Callable
 import numpy as np
+import scipy.linalg as la
 
 
 class EnsembleMethod:
-    @property
-    def xf_ensemble(self) -> np.ndarray:
-        return self._xf_ensemble
+    @classmethod
+    def Kalman_gain(
+        cls, H: np.ndarray, Pf: np.ndarray, R: np.ndarray, inflation_factor: float
+    ) -> np.ndarray:
+        """Computes the Kalman Gain Given the observation matrix, the prior covariance matrix and the error covariance matrix error R
 
-    @xf_ensemble.setter
-    def xf_ensemble(self, xf_i: np.ndarray):
-        self._xf_ensemble = xf_i
-        self.Pf = np.cov(xf_i)
+        :param H: Linearized observation operator
+        :type H: np.ndarray
+        :param Pf: Covariance matrix of the prior error
+        :type Pf: np.ndarray
+        :param R: Covariance matrix of the observation errors
+        :type R: np.ndarray
+        :return: Kalman Gain
+        :rtype: np.ndarray
+        """
 
-    @property
-    def xa_ensemble(self) -> np.ndarray:
-        return self._xa_ensemble
-
-    @xa_ensemble.setter
-    def xa_ensemble(self, xa_i: np.ndarray):
-        self._xa_ensemble = xa_i
-        self.Pa = np.cov(xa_i)
+        return np.linalg.multi_dot(
+            [
+                Pf,
+                H.T,
+                np.linalg.inv(np.linalg.multi_dot([H, Pf, H.T]) + R),
+            ]
+        )
 
     @property
     def Nensemble(self):
@@ -33,6 +40,12 @@ class EnsembleMethod:
     def R(self):
         """Observation error covariance matrix"""
         return self._R
+
+    @R.setter
+    def R(self, value):
+        self._R = value
+        self.Rinv = la.inv(value)
+        self.Rchol = la.cholesky(value)
 
     @property
     def H(self):

@@ -72,10 +72,10 @@ class EnKF(EnsembleMethod):
             u = np.random.multivariate_normal(
                 mean=np.zeros_like(y), cov=self.R, size=self.Nensemble
             )
-            y = y + u
+            y = np.atleast_2d(y).T + u.T
             self._R = np.atleast_2d(np.cov(u.T))  # Compute empirical covariance matrix
         Kstar = self.Kalman_gain(self.linearH, self.inflation_factor * self.Pf, self.R)
-        anomalies_vector = y.T - self.linearH @ self.xf_ensemble
+        anomalies_vector = y - self.linearH @ self.xf_ensemble
         self.xa_ensemble = self.xf_ensemble + Kstar @ anomalies_vector
         try:
             self.xa_ensemble_total = np.concatenate(
