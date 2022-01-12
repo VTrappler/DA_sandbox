@@ -7,42 +7,25 @@ from solvers.solvers import integrate_step
 from dynamicalsystems.dynmodels import DynamicalModel as Model
 
 
-class NonLinearOscillatorModel(Model):
-    dim = 2
-    omega = 0.035
-    lam = 3e-5
-    xi = None
-    dt = 1
-
+class NonLinearSerie(Model):
     def __init__(self):
         pass
 
     @classmethod
     def step(cls, f, t, x, dt):
-        if cls.xi is None:
-            xi = np.random.randn(1) * np.sqrt(0.0025)
-        else:
-            xi = cls.xi
-        return np.array(
-            [
-                x[1],
-                2 * x[1]
-                - x[0]
-                + (cls.omega ** 2) * x[1]
-                - (cls.lam ** 2) * x[1] ** 3
-                + xi[0],
-            ]
-        )
+        return np.array(0.5 * x + 25 * (x / (1 + x ** 2)) + 8 * np.cos(1.2 * t))
 
     @classmethod
     def integrate(cls, t0, x0, Nsteps):
         return integrate_step(cls.step, f=None, t0=t0, x0=x0, dt=cls.dt, Nsteps=Nsteps)
 
-
-osci = NonLinearOscillatorModel()
-osci.set_initial_state(0, np.array([0, 1]))
-osci.forward(1000)
-plt.plot(osci.state_vector[0, :])
+    @classmethod    
+    def observation(cls, x):
+        return np.array(x**2 / 20)
+serie = NonLinearSerie()
+serie.set_initial_state(0, np.array([0, 1]))
+serie.forward(1000)
+plt.plot(serie.state_vector[0, :])
 plt.show()
 
 
