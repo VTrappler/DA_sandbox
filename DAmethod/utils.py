@@ -1,3 +1,6 @@
+import numpy as np
+
+
 def Kalman_gain(H: np.ndarray, Pf: np.ndarray, R: np.ndarray) -> np.ndarray:
     """Computes the Kalman Gain Given the observation matrix, the prior covariance matrix and the error covariance matrix error R
     :param H: Linearized observation operator

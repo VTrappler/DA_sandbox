@@ -6,7 +6,7 @@ import numpy as np
 from typing import Optional, Union, Callable, Tuple
 import scipy.stats
 from DAmethod.baseparticlefilter import BaseParticleFilter
-from utils import Kalman_gain
+from DAmethod.utils import Kalman_gain
 
 
 class OptimalKPF(BaseParticleFilter):
@@ -42,9 +42,9 @@ class OptimalKPF(BaseParticleFilter):
             arr=self.particles,
         )
         self.Kstar = Kalman_gain(self.linearH, self.Q, self.R)
-        xkbar = (
-            np.eye(self.state_dimension) - self.Kstar @ self.linearH
-        ) @ xk + self.Kstar * obs
+        xkbar = (np.eye(self.state_dimension) - self.Kstar @ self.linearH) @ xk + (
+            self.Kstar @ obs
+        )[:, np.newaxis]
         Pk = (np.eye(self.state_dimension) - self.Kstar @ self.linearH) @ self.Q
 
         for i, xki in enumerate(xkbar.T):
@@ -98,11 +98,13 @@ class OptimalKPF(BaseParticleFilter):
             observations.append(obs)
             time.append(t)
             # Sample from the proposal distribution given by KF
-            self.sample_proposal(obs)
             # Update weights
             if full_obs:
-                self.update_weights(self.H(obs))
+                y = self.H(obs)
+                self.sample_proposal(y)
+                self.update_weights(y)
             else:
+                self.sample_proposal(obs)
                 self.update_weights(obs)
             # Normalize weights
             self.normalize_weights()
