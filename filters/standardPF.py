@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from typing import Callable, Optional, Tuple
+
 import numpy as np
-from typing import Optional, Union, Callable, Tuple
 import scipy.stats
-from DAmethod.baseparticlefilter import BaseParticleFilter
+from tqdm.autonotebook import tqdm
+
+from filters.baseparticlefilter import BaseParticleFilter
 
 # import tqdm
 
@@ -56,7 +59,7 @@ class BootstrapPF(BaseParticleFilter):
         particles = []
         time = []
         weights = []
-        for i in range(Nsteps):
+        for i in tqdm(range(Nsteps)):
             particles.append(self.particles)
             weights.append(self.weights)
             self.propagate_particles()
@@ -65,7 +68,6 @@ class BootstrapPF(BaseParticleFilter):
             t, obs = get_obs(i)
             observations.append(obs)
             time.append(t)
-
             if full_obs:
                 self.update_weights(self.H(obs))
             else:

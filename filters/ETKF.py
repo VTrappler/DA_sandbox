@@ -5,8 +5,7 @@ import scipy.linalg as la
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from DAmethod.EnsembleMethod import EnsembleMethod
-from tqdm.notebook import trange
-from dynamicalsystems.anharmonic_oscillator import NonLinearOscillatorModel
+
 
 """
 x_{k+1} = M_k(x_k)  + w_k
@@ -145,7 +144,7 @@ class ETKF(EnsembleMethod):
             iterator = range(Nsteps)
         else:
             iterator = range(Nsteps)
-        for i in range(Nsteps):
+        for i in iterator:
             self.forecast_ensemble()
             ensemble_f.append(self.xf_ensemble)
             t, y = get_obs(i)

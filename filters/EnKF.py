@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-#!/usr/bin/env python
-
 
 from typing import Callable, Tuple, Union, Optional
 import numpy as np
@@ -11,7 +9,6 @@ from dataclasses import dataclass
 import tqdm
 from DAmethod.EnsembleMethod import EnsembleMethod
 
-from dynamicalsystems.anharmonic_oscillator import NonLinearOscillatorModel
 
 """
 x_{k+1} = M_k(x_k)  + w_k

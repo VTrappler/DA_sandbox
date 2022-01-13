@@ -2,11 +2,14 @@
 # -*- coding: utf-8 -*-
 
 
+from typing import Callable, Optional, Tuple
+
 import numpy as np
-from typing import Optional, Union, Callable, Tuple
 import scipy.stats
-from DAmethod.baseparticlefilter import BaseParticleFilter
-from DAmethod.utils import Kalman_gain
+from tqdm.autonotebook import tqdm
+
+from filters.baseparticlefilter import BaseParticleFilter
+from filters.utils import Kalman_gain
 
 
 class OptimalKPF(BaseParticleFilter):
@@ -29,7 +32,7 @@ class OptimalKPF(BaseParticleFilter):
         super().__init__(state_dimension, Nparticles, R)
         self.Q = Q
 
-    def sample_proposal(self, obs: np.ndarray):
+    def sample_proposal(self, obs: np.ndarray) -> None:
         """Sample from the proposal distribution
 
         :param obs: observation to be "assimilated" using Kalman gain
@@ -88,8 +91,7 @@ class OptimalKPF(BaseParticleFilter):
         particles = []
         time = []
         weights = []
-        print(f"{'Iter': <5}{'ESS': <20}{'RMS': >10}")
-        for i in range(Nsteps):
+        for i in tqdm(range(Nsteps)):
             particles.append(self.particles)
             weights.append(self.weights)
 
