@@ -1,35 +1,67 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+
 from typing import Callable, Optional, Tuple
 
 import numpy as np
 import scipy.stats
 from tqdm.autonotebook import tqdm
 
-from filters.baseparticlefilter import BaseParticleFilter
+from .baseparticlefilter import BaseParticleFilter
+from .utils import Kalman_gain
 
-# import tqdm
 
-
-class BootstrapPF(BaseParticleFilter):
+class OptimalKPF(BaseParticleFilter):
     """Implementation of the standard particle filter, where the prior is chosen as sampling density, and the likelihood is used to reweights"""
 
-    def __init__(self, state_dimension: int, Nparticles: int, R: np.ndarray) -> None:
+    def __init__(
+        self, state_dimension: int, Nparticles: int, R: np.ndarray, Q: np.ndarray
+    ) -> None:
+        """initialise the optimal PF (based on EKF)
+
+        :param state_dimension: dimension of the state vector
+        :type state_dimension: int
+        :param Nparticles: Number of particles to consider
+        :type Nparticles: int
+        :param R: Observation error covariance matrix
+        :type R: np.ndarray
+        :param Q: Model error covariance matrix
+        :type Q: np.ndarray
+        """
         super().__init__(state_dimension, Nparticles, R)
+        self.Q = Q
+
+    def sample_proposal(self, obs: np.ndarray) -> None:
+        """Sample from the proposal distribution
+
+        :param obs: observation to be "assimilated" using Kalman gain
+        :type obs: np.ndarray
+        """
+        self.previous_particles = np.copy(self.particles)
+        xk = np.apply_along_axis(
+            self.forward,
+            axis=0,
+            arr=self.particles,
+        )
+        self.Kstar = Kalman_gain(self.linearH, self.Q, self.R)
+        xkbar = (np.eye(self.state_dimension) - self.Kstar @ self.linearH) @ xk + (
+            self.Kstar @ obs
+        )[:, np.newaxis]
+        Pk = (np.eye(self.state_dimension) - self.Kstar @ self.linearH) @ self.Q
+
+        for i, xki in enumerate(xkbar.T):
+            self.particles[:, i] = np.random.multivariate_normal(mean=xki, cov=Pk)
 
     def update_weights(self, y: np.ndarray) -> None:
         """Update the weights using the likelihood (Standard PF/Bootstrap Bayesian Filtering)
-
         :param y: observation
         :type y: np.ndarray
         """
-        lik = np.ones(self.Nparticles)
-        for i, part in enumerate(self.particles.T):
-            dist = y - self.H(part)
-            lik[i] = scipy.stats.multivariate_normal(np.zeros(len(dist)), self.R).pdf(
-                dist
-            )
+        lik = np.empty_like(self.weights)
+        for i, part in enumerate(self.previous_particles.T):
+            cov_lik = self.linearH @ self.Q @ self.linearH.T + self.R
+            lik[i] = scipy.stats.multivariate_normal(self.H(part), cov_lik).pdf(y)
         self.weights = self.weights * lik
 
     def run(
@@ -62,16 +94,21 @@ class BootstrapPF(BaseParticleFilter):
         for i in tqdm(range(Nsteps)):
             particles.append(self.particles)
             weights.append(self.weights)
-            self.propagate_particles()
 
             # Get observations
             t, obs = get_obs(i)
             observations.append(obs)
             time.append(t)
+            # Sample from the proposal distribution given by KF
+            # Update weights
             if full_obs:
-                self.update_weights(self.H(obs))
+                y = self.H(obs)
+                self.sample_proposal(y)
+                self.update_weights(y)
             else:
+                self.sample_proposal(obs)
                 self.update_weights(obs)
+            # Normalize weights
             self.normalize_weights()
 
             estimates.append(self.estimate())

@@ -3,8 +3,8 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from solvers.solvers import RK4_step, integrate_step
-from dynamicalsystems.dynmodels import DynamicalModel as Model
+from ..solvers.solvers import RK4_step, integrate_step
+from .dynmodels import DynamicalModel as Model
 
 
 def phi(v, pm):

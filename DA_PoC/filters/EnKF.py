@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 
-from typing import Callable, Tuple, Union, Optional
+from typing import Callable, Tuple
 import numpy as np
-import scipy.integrate
-import matplotlib.pyplot as plt
-import scipy
 from dataclasses import dataclass
-import tqdm
-from DAmethod.EnsembleMethod import EnsembleMethod
+from tqdm.autonotebook import tqdm
+
+from .EnsembleMethod import EnsembleMethod
 
 
 """
@@ -111,7 +109,7 @@ class EnKF(EnsembleMethod):
         ensemble_f = []
         ensemble_a = []
         time = []
-        for i in range(Nsteps):
+        for i in tqdm(range(Nsteps)):
             self.forecast_ensemble()
             ensemble_f.append(self.xf_ensemble)
             t, y = get_obs(i)

@@ -1,9 +1,8 @@
-from typing import Callable, Tuple, Union, Optional
+from typing import Callable, Tuple, Union
 import numpy as np
-from numpy.linalg import multi_dot
 import scipy.linalg as la
-import matplotlib.pyplot as plt
 from utils import Kalman_gain
+from tqdm.autonotebook import tqdm
 
 
 class KalmanFilter:
@@ -95,7 +94,7 @@ class KalmanFilter:
         xf = []
         xa = []
         time = []
-        for i in range(Nsteps):
+        for i in tqdm(range(Nsteps)):
             self.forecast()
             print(self.xf)
             xf.append(self.xf)

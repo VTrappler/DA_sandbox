@@ -1,11 +1,11 @@
-from typing import Callable, Tuple, Union, Optional
-import numpy as np
-from numpy.linalg import multi_dot
-import scipy.linalg as la
-import matplotlib.pyplot as plt
 from dataclasses import dataclass
-from DAmethod.EnsembleMethod import EnsembleMethod
+from typing import Callable, Tuple
 
+import numpy as np
+import scipy.linalg as la
+from .EnsembleMethod import EnsembleMethod
+from numpy.linalg import multi_dot
+from tqdm.autonotebook import tqdm
 
 """
 x_{k+1} = M_k(x_k)  + w_k
@@ -143,7 +143,7 @@ class ETKF(EnsembleMethod):
         if not verbose:
             iterator = range(Nsteps)
         else:
-            iterator = range(Nsteps)
+            iterator = tqdm(range(Nsteps))
         for i in iterator:
             self.forecast_ensemble()
             ensemble_f.append(self.xf_ensemble)

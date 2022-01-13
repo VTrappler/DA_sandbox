@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Optional, Union, Callable, Tuple
 import scipy.linalg as la
-from DAmethod.particle_filter import ParticleFilter
+from .baseparticlefilter import BaseParticleFilter
 
 # from lorenz import LorenzModel
 # from dynamicalsystems.anharmonic_oscillator import NonLinearOscillatorModel
@@ -15,7 +15,7 @@ def unscented_transform(
     alpha: float = 1e-3,
     beta: float = 2,
     kappa: float = 0.0,
-):
+) -> Tuple[np.ndarray, np.ndarray]:
     Lambda = alpha ** 2 * (L + kappa) - L
     Pfsqrt = la.cholesky((Lambda + L) * cov)
     sigma_points = np.empty((len(mean), 2 * L + 1))
@@ -37,7 +37,7 @@ def unscented_mean_covariance(
     weights: np.ndarray,
     alpha: float = 1e-3,
     beta: float = 2.0,
-):
+) -> Tuple[np.ndarray, np.ndarray]:
     mean = np.average(sigma_points, weights=weights, axis=1)
     weights_c = weights
     weights_c[0] += 1 - alpha ** 2 + beta

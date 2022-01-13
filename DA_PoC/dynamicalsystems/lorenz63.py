@@ -3,9 +3,9 @@
 
 
 import numpy as np
-from solvers.solvers import RK4_step, integrate_step
+from ..solvers.solvers import RK4_step, integrate_step
 import matplotlib.pyplot as plt
-from dynamicalsystems.dynmodels import DynamicalModel as Model
+from .dynmodels import DynamicalModel as Model
 
 
 class Lorenz63Model(Model):

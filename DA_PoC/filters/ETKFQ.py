@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 
 
-from typing import Callable, Tuple, Union, Optional
+from typing import Callable, Tuple
 import numpy as np
 import scipy.linalg as la
-import matplotlib.pyplot as plt
 from dataclasses import dataclass
 
-from scipy.sparse import construct
-from DAmethod.EnsembleMethod import EnsembleMethod
-from DAmethod.ETKF import ETKF
+from tqdm.autonotebook import tqdm
+
+from .ETKF import ETKF
 
 
 """
@@ -161,7 +160,7 @@ class ETKFQ(ETKF):
         ensemble_f = []
         ensemble_a = []
         time = []
-        for i in range(Nsteps):
+        for i in tqdm(range(Nsteps)):
             self.forecast_ensemble()
             ensemble_f.append(self.xf_ensemble)
             t, y = get_obs(i)

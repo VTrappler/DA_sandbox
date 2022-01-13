@@ -3,8 +3,8 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-from solvers.solvers import integrate_step
-from dynamicalsystems.dynmodels import DynamicalModel as Model
+from ..solvers.solvers import integrate_step
+from .dynmodels import DynamicalModel as Model
 
 
 class LinearModel(Model):
