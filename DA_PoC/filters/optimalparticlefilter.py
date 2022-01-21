@@ -16,7 +16,12 @@ class OptimalKPF(BaseParticleFilter):
     """Implementation of the standard particle filter, where the prior is chosen as sampling density, and the likelihood is used to reweights"""
 
     def __init__(
-        self, state_dimension: int, Nparticles: int, R: np.ndarray, Q: np.ndarray
+        self,
+        state_dimension: int,
+        Nparticles: int,
+        R: np.ndarray,
+        Q: np.ndarray,
+        rng: np.random.Generator,
     ) -> None:
         """initialise the optimal PF (based on EKF)
 
@@ -29,7 +34,7 @@ class OptimalKPF(BaseParticleFilter):
         :param Q: Model error covariance matrix
         :type Q: np.ndarray
         """
-        super().__init__(state_dimension, Nparticles, R)
+        super().__init__(state_dimension, Nparticles, R, rng)
         self.Q = Q
 
     def sample_proposal(self, obs: np.ndarray) -> None:

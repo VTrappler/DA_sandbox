@@ -16,8 +16,14 @@ class BootstrapPF(BaseParticleFilter):
     """Implementation of the standard particle filter,
     where the prior is chosen as sampling density, and the likelihood is used to reweights"""
 
-    def __init__(self, state_dimension: int, Nparticles: int, R: np.ndarray) -> None:
-        super().__init__(state_dimension, Nparticles, R)
+    def __init__(
+        self,
+        state_dimension: int,
+        Nparticles: int,
+        R: np.ndarray,
+        rng: np.random.Generator = np.random.default_rng(),
+    ) -> None:
+        super().__init__(state_dimension, Nparticles, R, rng)
 
     def update_weights(self, y: np.ndarray) -> None:
         """Update the weights using the likelihood (Standard PF/Bootstrap Bayesian Filtering)

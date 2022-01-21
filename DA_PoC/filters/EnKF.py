@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from tqdm.autonotebook import tqdm
 
 from .EnsembleMethod import EnsembleMethod
-
+from .utils import Kalman_gain
 
 """
 x_{k+1} = M_k(x_k)  + w_k
@@ -19,39 +19,19 @@ where Cov[v_k] = R_k, Cov[w_k] = Q_k
 class EnKF(EnsembleMethod):
     """Wrapper class for running an EnKF"""
 
-    @classmethod
-    def Kalman_gain(cls, H: np.ndarray, Pf: np.ndarray, R: np.ndarray) -> np.ndarray:
-        """Computes the Kalman Gain Given the observation matrix, the prior covariance matrix and the error covariance matrix error R
-
-        :param H: Linearized observation operator
-        :type H: np.ndarray
-        :param Pf: Covariance matrix of the prior error
-        :type Pf: np.ndarray
-        :param R: Covariance matrix of the observation errors
-        :type R: np.ndarray
-        :return: Kalman Gain
-        :rtype: np.ndarray
-        """
-
-        return np.linalg.multi_dot(
-            [
-                Pf,
-                H.T,
-                np.linalg.inv(np.linalg.multi_dot([H, Pf, H.T]) + R),
-            ]
-        )
-
     def __init__(
         self,
         state_dimension: int,
         Nensemble: int,
         R: np.ndarray,
         inflation_factor: float = 1.0,
+        rng: np.random.Generator = np.random.default_rng(),
     ) -> None:
         self._state_dimension = state_dimension
         self._Nensemble = Nensemble
         self._R = R
         self._inflation_factor = inflation_factor
+        self.rng = rng
 
     # EnKF parameters ---
 
@@ -64,12 +44,16 @@ class EnKF(EnsembleMethod):
         :type stochastic: bool, optional
         """
         if stochastic:
-            u = np.random.multivariate_normal(
+            # Perturbation of the observed data
+            u = self.rng.multivariate_normal(
                 mean=np.zeros_like(y), cov=self.R, size=self.Nensemble
             )
             y = np.atleast_2d(y).T + u.T
             self._R = np.atleast_2d(np.cov(u.T))  # Compute empirical covariance matrix
-        Kstar = self.Kalman_gain(self.linearH, self.inflation_factor * self.Pf, self.R)
+        # if self.localization:
+        #     pass
+        # else:
+        Kstar = Kalman_gain(self.linearH, self.inflation_factor * self.Pf, self.R)
         anomalies_vector = y - self.linearH @ self.xf_ensemble
         self.xa_ensemble = self.xf_ensemble + Kstar @ anomalies_vector
         try:

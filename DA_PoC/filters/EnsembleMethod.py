@@ -1,7 +1,6 @@
 from typing import Callable
 import numpy as np
 import scipy.linalg as la
-from utils import Kalman_gain
 
 
 class EnsembleMethod:
@@ -65,7 +64,9 @@ class EnsembleMethod:
         """Initialize inflation factor"""
         return self._inflation_factor
 
-    def generate_ensemble(self, mean: np.ndarray, cov: np.ndarray) -> None:
+    def generate_ensemble(
+        self, mean: np.ndarray, cov: np.ndarray, rng: np.random.Generator
+    ) -> None:
         """Generation of the ensemble members, using a multivariate normal rv
 
         :param mean: mean of the ensemble members
@@ -73,7 +74,7 @@ class EnsembleMethod:
         :param cov: Covariance matrix
         :type cov: np.ndarray
         """
-        self.xf_ensemble = np.random.multivariate_normal(
+        self.xf_ensemble = rng.multivariate_normal(
             mean=mean, cov=cov, size=self.Nensemble
         ).T
         self.xf_ensemble_total = self.xf_ensemble[:, :, np.newaxis]

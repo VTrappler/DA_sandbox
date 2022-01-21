@@ -28,16 +28,14 @@ class ETKFQ(ETKF):
         Nensemble: int,
         R: np.ndarray,
         Q: np.ndarray,
-        inflation_factor: float = 1.0,
+        inflation_factor: float = 1,
     ) -> None:
         if state_dimension < Nensemble:
             raise ValueError(
                 "State dimension should be larger than the ensemble number"
             )
-        self._state_dimension = state_dimension
-        self._Nensemble = Nensemble
-        self._R = R
-        self._inflation_factor = inflation_factor
+        super().__init__(state_dimension, Nensemble, R, inflation_factor)
+        self.Q = Q
         self.U, self.Uinv = self.constructU(self.Nensemble)
 
     @classmethod
@@ -52,122 +50,82 @@ class ETKFQ(ETKF):
         Uinv = np.concatenate([np.ones((m, 1)), Um * np.sqrt(m - 1)], axis=1)
         return U, Uinv
 
-    def normalised_anomalies(self) -> np.ndarray:
-        """Computes the state normalised anomalies
-
-        :return: (state_dim x Nensemble) matrix
-        :rtype: np.ndarray
-        """
-        return (self.xf_ensemble - self.xf_ensemble.mean(1, keepdims=True)) / np.sqrt(
-            self.Nensemble - 1
-        )
-
-    def observation_anomalies(self) -> np.ndarray:
-        """Computes the observation anomalies
-
-        :return: the normalised observation anomalies of dimension (obs_dim x Nensemble)
-        :rtype: np.ndarray
-        """
-        Hxf = self.H(self.xf_ensemble)
-        return (Hxf - Hxf.mean(1, keepdims=True)) / np.sqrt(self.Nensemble - 1)
-
-    def compute_transform(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Compute the transform matrix T, and its square T2 based on the observation anomalies
-
-        :return: T and (T @ T.T)
-        :rtype: Tuple[np.ndarray, np.ndarray]
-        """
-        Yf = self.observation_anomalies()
-        Tsqm1 = np.eye(self.Nensemble) + Yf.T @ la.inv(self.R) @ Yf
-        Tsq = la.inv(Tsqm1)
-        return la.sqrtm(Tsq), Tsq
-
     def update_ensemble(self) -> np.ndarray:
         """Update ensemble using the deviation matrix taking into account the model error
 
-        :return: the updated ensemble
+        :return: updated ensemble
         :rtype: np.ndarray
         """
+
+        print(f"{self.U.shape=}")
         m = self.Nensemble
+        print(f"{m=}")
         tmp = self.xf_ensemble @ self.U
         xkbar, deviation_mat = tmp[:, 0], tmp[:, 1:]
         eivals, Vk = np.linalg.eigh(deviation_mat @ deviation_mat.T + self.Q)
-        truncated_eigvals = eivals[: (m - 1) : -1]
+        # print(f"{eivals.shape=}")
+        # print(f"{Vk.shape=}")
+        # print(f"{eivals=}")
+        truncated_eigvals = eivals[:-(m):-1]
+        print(f"{truncated_eigvals=}")
         Lambdak = np.diag(truncated_eigvals)  # Keep m-1 largest eigenvalues
-        Vk = Vk[:, : (m - 1) : -1]
+        # print(f"{Lambdak.shape=}")
+        Vk = Vk[:, :-(m):-1]
+        # print(f"{Vk.shape=}")
         new_deviation_matrix = Vk @ np.sqrt(Lambdak)
-        Ek = np.concatenate([xkbar, new_deviation_matrix], axis=1) @ self.Uinv
+        # print(f"{xkbar.shape=}")
+        # print(f"{deviation_mat.shape=}")
+        # print(f"{new_deviation_matrix.shape=}")
+        # print(f"{xkbar[:, np.newaxis].shape=}")
+
+        Ek = (
+            np.concatenate([xkbar[:, np.newaxis], new_deviation_matrix], axis=1)
+            @ self.Uinv
+        )
         return Ek
-
-    def analysis(self, y: np.ndarray, stochastic: bool = True) -> None:
-        """Performs the analysis step given the observation
-
-        :param y: Observation to be assimilated
-        :type y: np.ndarray
-        :param stochastic: Perform Stochastic EnKF, ie perturbates observations, defaults to True
-        :type stochastic: bool, optional
-        """
-
-        innovation_vector = y - (self.H(self.xf_ensemble)).mean(1, keepdims=True)
-        Yf = self.observation_anomalies()
-        T, T2 = self.compute_transform()
-        wa = T2 @ Yf.T @ la.solve(self.R, innovation_vector, sym_pos=True)
-
-        xfbar = self.xf_ensemble.mean(1, keepdims=True)
-
-        self.xa_ensemble = (
-            xfbar
-            + self.inflation_factor
-            * self.normalised_anomalies()
-            @ (wa + np.sqrt(self.Nensemble - 1) * T)
-        )
-
-        try:
-            self.xa_ensemble_total = np.concatenate(
-                [self.xa_ensemble_total, self.xa_ensemble[:, :, np.newaxis]], 2
-            )
-        except AttributeError:
-            self.xa_ensemble_total = self.xa_ensemble[:, :, np.newaxis]
-
-    def forecast_ensemble(self) -> None:
-        """Propagates the ensemble members through the model"""
-        try:
-            self.xf_ensemble = np.apply_along_axis(
-                self.forward,
-                axis=0,
-                arr=self.xa_ensemble,
-            )
-        except AttributeError:
-            self.xf_ensemble = np.apply_along_axis(
-                self.forward,
-                axis=0,
-                arr=self.xf_ensemble,
-            )
-
-        self.xf_ensemble = self.update_ensemble()
-        self.xf_ensemble_total = np.concatenate(
-            [self.xf_ensemble_total, self.xf_ensemble[:, :, np.newaxis]], 2
-        )
 
     def run(
         self,
         Nsteps: int,
         get_obs: Callable[[int], Tuple[float, np.ndarray]],
         full_obs: bool = True,
+        verbose: bool = True,
     ) -> dict:
+        """Run the filter
+
+        :param Nsteps: Number of assimilation steps to perform
+        :type Nsteps: int
+        :param get_obs: Function which provides the (time, observation) tuple
+        :type get_obs: Callable[[int], Tuple[float, np.ndarray]]
+        :param full_obs: Does the obs operator needs to be applied before the analysis, defaults to True
+        :type full_obs: bool, optional
+        :param verbose: tqdm progress bar, defaults to True
+        :type verbose: bool, optional
+        :return: Dictionary containing the ensemble members, analised or not
+        :rtype: dict
+        """
+        if verbose:
+            iterator = tqdm(range(Nsteps))
+        else:
+            iterator = range(Nsteps)
 
         observations = []
         ensemble_f = []
         ensemble_a = []
         time = []
-        for i in tqdm(range(Nsteps)):
+        for i in iterator:
             self.forecast_ensemble()
+            self.xf_ensemble = self.update_ensemble()
             ensemble_f.append(self.xf_ensemble)
             t, y = get_obs(i)
             observations.append(y)
             time.append(t)
 
-            self.analysis(self.H(y))
+            if full_obs:
+                self.analysis(self.H(y))
+            else:
+                self.analysis(y)
+
             ensemble_a.append(self.xa_ensemble)
         return {
             "observations": observations,

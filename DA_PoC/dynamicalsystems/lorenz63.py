@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
+from typing import Tuple
 import numpy as np
 from ..solvers.solvers import RK4_step, integrate_step
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ class Lorenz63Model(Model):
     solver = RK4_step
 
     @classmethod
-    def dotfunction(cls, t, x):
+    def dotfunction(cls, t: float, x: np.ndarray) -> np.ndarray:
         """Lorenz 96 model with constant forcing"""
         # Setting up vector
         d = np.zeros(3)
@@ -23,15 +24,17 @@ class Lorenz63Model(Model):
         return d
 
     @classmethod
-    def integrate(cls, t0, x0, Nsteps):
+    def integrate(
+        cls, t0: float, x0: np.ndarray, Nsteps: int
+    ) -> Tuple[float, np.ndarray]:
         return integrate_step(cls.solver, cls.dotfunction, t0, x0, cls.dt, Nsteps)
 
     @classmethod
-    def TLM(self, x):
+    def TLM(self, x: np.ndarray) -> np.ndarray:
         return np.array(
             [
                 [-10, 10, 0],
-                [28 - x[2], -1 - x[0]],
+                [28 - x[2], -1, -x[0]],
                 [x[1], x[0], -8.0 / 3.0],
             ]
         )

@@ -1,7 +1,9 @@
+from logging import warning
 from typing import Callable, Tuple, Union
+import warnings
 import numpy as np
 import scipy.linalg as la
-from utils import Kalman_gain
+from .utils import Kalman_gain
 from tqdm.autonotebook import tqdm
 
 
@@ -41,11 +43,17 @@ class KalmanFilter:
     @H.setter
     def H(self, value):
         if callable(value):
+            warnings.warn(
+                "The observation operator has been set with an arbitrary function. Set a linearization of H in self.linearH"
+            )
             self._H = value
             self.linearH = None
         elif isinstance(value, np.ndarray):
             self._H = lambda x: value @ x
-            self.linearH = value
+            self.linearH = lambda x: value
+
+    def set_forwardmodel(self, M):
+        self.M = M
 
     @property
     def M(self):
@@ -55,11 +63,14 @@ class KalmanFilter:
     @M.setter
     def M(self, value):
         if callable(value):
+            warnings.warn(
+                "The forward model has been set with an arbitrary function. Set a linearization of M in self.linearM"
+            )
             self._M = value
             self.linearM = None
         elif isinstance(value, np.ndarray):
             self._M = lambda x: value @ x
-            self.linearM = value
+            self.linearM = lambda x: value
 
     def set_x0(self, x0, P0):
         self.xf = x0
@@ -73,17 +84,19 @@ class KalmanFilter:
             self.Pa = self.Pf
         else:
             innovation_vector = obs - self.H(self.xf)
-            Kstar = Kalman_gain(self.linearH, self.Pf, self.R)
+            Kstar = Kalman_gain(self.linearH(self.xf), self.Pf, self.R)
             self.xa = self.xf + Kstar @ innovation_vector
-            self.Pa = (np.eye(self.state_dimension) - Kstar @ self.linearH) @ self.Pf
+            self.Pa = (
+                np.eye(self.state_dimension) - Kstar @ self.linearH(self.xf)
+            ) @ self.Pf
 
     def forecast(self) -> None:
         try:
             self.xf = self.M(self.xa)
-            self.Pf = self.linearM @ self.Pa @ self.linearM.T + self.Q
+            self.Pf = self.linearM(self.xf) @ self.Pa @ self.linearM(self.xf).T + self.Q
         except:
             self.xf = self.M(self.xf)
-            self.Pf = self.linearM @ self.Pf @ self.linearM.T + self.Q
+            self.Pf = self.linearM(self.xf) @ self.Pf @ self.linearM(self.xf).T + self.Q
 
     def run(
         self,
@@ -94,18 +107,23 @@ class KalmanFilter:
         xf = []
         xa = []
         time = []
+        Pa = []
+        Pf = []
         for i in tqdm(range(Nsteps)):
             self.forecast()
-            print(self.xf)
             xf.append(self.xf)
+            Pf.append(self.Pf)
             t, y = get_obs(i)
             observations.append(y)
             time.append(t)
             self.analysis(self.H(y))
             xa.append(self.xa)
+            Pa.append(self.Pa)
         return {
             "observations": observations,
             "xf": xf,
+            "Pf": Pf,
+            "Pa": Pa,
             "xa": xa,
             "time": time,
         }

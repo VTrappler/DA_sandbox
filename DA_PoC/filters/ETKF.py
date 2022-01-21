@@ -24,6 +24,7 @@ class ETKF(EnsembleMethod):
         Nensemble: int,
         R: np.ndarray,
         inflation_factor: float = 1.0,
+        rng: np.random.Generator = np.random.default_rng(),
     ) -> None:
         self._state_dimension = state_dimension
         self._Nensemble = Nensemble
@@ -31,17 +32,32 @@ class ETKF(EnsembleMethod):
         self._inflation_factor = inflation_factor
 
     def state_anomalies(self) -> np.ndarray:
+        """Computes the state normalised anomalies x - xbar/ sqrt(N-1)
+
+        :return: matrix of state anomalies X of dim (state_dim * Nensemble)
+        :rtype: np.ndarray
+        """
         return (self.xf_ensemble - self.xf_ensemble.mean(1, keepdims=True)) / np.sqrt(
             self.Nensemble - 1
         )
 
     def observation_anomalies(self) -> np.ndarray:
+        """Computes the observation normalised anomalies H(x) - Hbar(x) / sqrt(N-1)
+
+        :return: matrix of state anomalies Y of dim (obs_dim * Nensemble)
+        :rtype: np.ndarray
+        """
         Hxf = self.H(self.xf_ensemble)
         Yf = (Hxf - Hxf.mean(1, keepdims=True)) / np.sqrt(self.Nensemble - 1)
         precYf = la.solve_triangular(self.Rchol, Yf)
         return Yf, precYf
 
     def compute_transform(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Computes the transform matrix using "naive" method
+
+        :return: transform matrix T and its square
+        :rtype: Tuple[np.ndarray, np.ndarray]
+        """
         Yf, Yfhat = self.observation_anomalies()
         Tsqm1 = np.eye(self.Nensemble) + Yf.T @ self.Rinv @ Yf
         print(f"{la.det(Tsqm1)=}")
@@ -49,6 +65,11 @@ class ETKF(EnsembleMethod):
         return la.sqrtm(Tsq), Tsq
 
     def compute_transform_SVD(self) -> Tuple[np.ndarray, np.ndarray]:
+        """Computes the transform matrix using SVD
+
+        :return: Transform matrix, and the SVD of the preconditionned Yf
+        :rtype: Tuple[np.ndarray, np.ndarray]
+        """
         Yf, Yfhat = self.observation_anomalies()
         U, Sigma, VT = la.svd(Yfhat.T)
         if self.linearH.shape[0] < self.Nensemble:
@@ -64,7 +85,6 @@ class ETKF(EnsembleMethod):
         else:
             Lm = 1 / np.sqrt(1 + Sigma ** 2)
         T = (U * Lm) @ U.T
-
         return T, U, Sigma, VT
 
     def analysis(self, obs: np.ndarray) -> None:
@@ -133,9 +153,21 @@ class ETKF(EnsembleMethod):
         Nsteps: int,
         get_obs: Callable[[int], Tuple[float, np.ndarray]],
         full_obs: bool = True,
-        verbose=True,
+        verbose: bool = True,
     ) -> dict:
+        """Run the filter
 
+        :param Nsteps: Number of assimilation steps to perform
+        :type Nsteps: int
+        :param get_obs: Function which provides the (time, observation) tuple
+        :type get_obs: Callable[[int], Tuple[float, np.ndarray]]
+        :param full_obs: Does the obs operator needs to be applied before the analysis, defaults to True
+        :type full_obs: bool, optional
+        :param verbose: tqdm progress bar, defaults to True
+        :type verbose: bool, optional
+        :return: Dictionary containing the ensemble members, analised or not
+        :rtype: dict
+        """
         observations = []
         ensemble_f = []
         ensemble_a = []
@@ -150,8 +182,11 @@ class ETKF(EnsembleMethod):
             t, y = get_obs(i)
             observations.append(y)
             time.append(t)
+            if full_obs:
+                self.analysis(self.H(y))
+            else:
+                self.analysis(y)
 
-            self.analysis(self.H(y))
             ensemble_a.append(self.xa_ensemble)
         return {
             "observations": observations,
